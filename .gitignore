@@ -15,3 +15,7 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+
+topic_segments/
+original_video.mp4
