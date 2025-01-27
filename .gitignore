@@ -1,6 +1,3 @@
-# Environment variables
-.env
-
 # Python cache files
 __pycache__/
 *.py[cod]
@@ -16,6 +13,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 
-
 topic_segments/
 original_video.mp4
+
+.env

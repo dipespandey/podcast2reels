@@ -12,6 +12,9 @@ def get_first_frame(input_video):
 
 def get_all_frames(input_video):
     cap = cv2.VideoCapture(input_video)
+    if not cap.isOpened():
+        print(f"Error: Could not open video file {input_video}")
+        return
     frames = []
     while True:
         ret, frame = cap.read()
@@ -62,7 +65,7 @@ def create_reel_frame(frame, person_bbox):
     # Resize to target dimensions
     return cv2.resize(cropped, (target_width, target_height))
 
-def process_video_with_stabilization(input_video, output_video, model, movement_threshold=500):
+def process_video_with_stabilization(input_video, output_video, filter_sub=None, movement_threshold=150):
     """Process video with stabilization to reduce jitter"""
     
     frames = get_all_frames(input_video)
@@ -88,6 +91,7 @@ def process_video_with_stabilization(input_video, output_video, model, movement_
     print(f"Processing {len(frames)} frames...")
     
     # First pass: Detect person in each frame and apply stabilization
+    model = YOLO('yolov8n.pt')
     for i, frame in enumerate(frames):
         current_bbox = detect_person(frame, model)
         
@@ -108,6 +112,8 @@ def process_video_with_stabilization(input_video, output_video, model, movement_
             # Check if movement exceeds threshold
             current_center = (current_bbox[0], current_bbox[1])
             last_center = (last_stable_bbox[0], last_stable_bbox[1])
+
+            print(euclidean_distance(current_center, last_center), movement_threshold)
             
             if euclidean_distance(current_center, last_center) < movement_threshold:
                 # Movement is small, use the last stable bbox
@@ -132,22 +138,39 @@ def process_video_with_stabilization(input_video, output_video, model, movement_
     
     # Convert to web-compatible format and add audio using ffmpeg
     web_output = output_video.replace('.mp4', '_web.mp4')
-    
+
     try:
-        subprocess.run([
-            'ffmpeg', '-y',
-            '-i', temp_video,  # Processed video
-            '-i', input_video,  # Original video (for audio)
-            '-c:v', 'libx264',  # Video codec
-            '-preset', 'fast',
-            '-crf', '23',
-            '-c:a', 'aac',  # Audio codec
-            '-map', '0:v:0',  # Use video from first input
-            '-map', '1:a:0?',  # Use audio from second input if it exists
-            '-shortest',  # End when shortest input ends
-            '-movflags', '+faststart',
-            web_output
-        ], check=True)
+        if filter_sub:
+            subprocess.run([
+                'ffmpeg', '-y',
+                '-i', temp_video,  # Processed video
+                '-i', input_video,  # Original video (for audio)
+                '-c:v', 'libx264',  # Video codec
+                '-preset', 'fast',
+                '-crf', '23',
+                '-c:a', 'aac',  # Audio codec
+                '-map', '0:v:0',  # Use video from first input
+                '-map', '1:a:0?',  # Use audio from second input if it exists
+                '-shortest',  # End when shortest input ends
+                '-movflags', '+faststart',
+                '-vf', filter_sub,
+                web_output
+            ], check=True)
+        else:
+            subprocess.run([
+                'ffmpeg', '-y',
+                '-i', temp_video,  # Processed video
+                '-i', input_video,  # Original video (for audio)
+                '-c:v', 'libx264',  # Video codec
+                '-preset', 'fast',
+                '-crf', '23',
+                '-c:a', 'aac',  # Audio codec
+                '-map', '0:v:0',  # Use video from first input
+                '-map', '1:a:0?',  # Use audio from second input if it exists
+                '-shortest',  # End when shortest input ends
+                '-movflags', '+faststart',
+                web_output
+            ], check=True)
         
         # Clean up temporary files
         os.remove(temp_video)
